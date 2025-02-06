@@ -10,6 +10,10 @@ import json
 # Set up Google Credentials using Streamlit secrets
 google_credentials_json = st.secrets["google_sheets"]["credentials_json"]
 
+clean_credentials = re.sub(r'[^\x00-\x7F]+', '', google_credentials_json)  # Clean the credentials
+
+credentials_dict = json.loads(clean_credentials, strict=False)  # Convert the credentials JSON string back into a dictionary
+
 st.set_page_config(page_title="Defect Tracer | Submit Defects", page_icon="cfm-holdings-logo.png", layout="centered", initial_sidebar_state="expanded")
 
 if 'email' not in st.session_state:
@@ -23,8 +27,8 @@ else:
             sleep(1)
             st.switch_page("Login.py")
 
+
 # OPEN THE GOOGLE SPREADSHEET & SET UP LOCAL CACHE ######################################
-credentials_dict = json.loads(google_credentials_json) # Convert the credentials JSON string from Streamlit secrets into a dictionary
 
 # Define the scope of the app (access to Sheets and Drive)
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
