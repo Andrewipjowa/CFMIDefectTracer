@@ -1,8 +1,9 @@
-Streamlit
-pyrebase4
+streamlit
 gspread
 google-auth
 google-auth-oauthlib
 google-auth-httplib2
-plotly
 python-dotenv
+pandas
+matplotlib
+pyrebase4
