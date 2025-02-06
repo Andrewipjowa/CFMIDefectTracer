@@ -5,12 +5,10 @@ import gspread
 from google.oauth2 import service_account
 from google.oauth2.service_account import Credentials
 import re
-from dotenv import load_dotenv
-import os
+import json
 
-# Set up Google Credentials path
-load_dotenv()
-google_credentials_path = os.getenv("GOOGLE_CREDENTIALS_PATH")
+# Set up Google Credentials using Streamlit secrets
+google_credentials_json = st.secrets["google_sheets"]["credentials_json"]
 
 st.set_page_config(page_title="Defect Tracer | Submit Defects", page_icon="cfm-holdings-logo.png", layout="centered", initial_sidebar_state="expanded")
 
@@ -26,8 +24,13 @@ else:
             st.switch_page("Login.py")
 
 # OPEN THE GOOGLE SPREADSHEET & SET UP LOCAL CACHE ######################################
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]  # Define the scope of the app (access to Sheets and Drive)
-creds = Credentials.from_service_account_file(google_credentials_path, scopes=scope)  # Authenticate using the credentials file
+credentials_dict = json.loads(google_credentials_json) # Convert the credentials JSON string from Streamlit secrets into a dictionary
+
+# Define the scope of the app (access to Sheets and Drive)
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+
+# Authenticate using the credentials
+creds = Credentials.from_service_account_info(credentials_dict, scopes=scope)
 client = gspread.authorize(creds)  # Authorize the client
 
 # Open the spreadsheets once and store them in session state
@@ -168,8 +171,6 @@ with tab1:
     action = st.text_area("**Description of Action(s) Taken:** (max. 300 characters)", max_chars=300, placeholder="Go into detail on the action(s) taken")
     submitter = st.text_input("**Submitter:**", max_chars=50, placeholder="Enter name of submitter")
     checkbox = st.checkbox("I understand that this submission is final and cannot be edited or deleted.")
-
-    st.write("New Category is" + new_category)
 
     # Handle Submission
     if st.button("Submit"):
