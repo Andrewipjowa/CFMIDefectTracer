@@ -7,14 +7,23 @@ from google.oauth2.service_account import Credentials
 import re
 import json
 
+st.set_page_config(page_title="Defect Tracer | Submit Defects", page_icon="cfm-holdings-logo.png", layout="centered", initial_sidebar_state="expanded")
+
+st.markdown("""
+    <style>
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+        [data-testid="stToolbar"] {display: none !important;} /* Hides the top right menu */
+    </style>
+""", unsafe_allow_html=True)
+
 # Set up Google Credentials using Streamlit secrets
 google_credentials_json = st.secrets["google_sheets"]["credentials_json"]
 
 clean_credentials = re.sub(r'[^\x00-\x7F]+', '', google_credentials_json)  # Clean the credentials
 
 credentials_dict = json.loads(clean_credentials, strict=False)  # Convert the credentials JSON string back into a dictionary
-
-st.set_page_config(page_title="Defect Tracer | Submit Defects", page_icon="cfm-holdings-logo.png", layout="centered", initial_sidebar_state="expanded")
 
 if 'email' not in st.session_state:
     st.switch_page("./Login.py")  # Switch to login page if user is not logged in

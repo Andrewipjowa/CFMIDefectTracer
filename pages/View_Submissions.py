@@ -8,6 +8,15 @@ from collections import Counter, defaultdict
 
 st.set_page_config(page_title="Defect Tracer | View Submissions", page_icon="cfm-holdings-logo.png", layout="centered", initial_sidebar_state="expanded")
 
+st.markdown("""
+    <style>
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+        [data-testid="stToolbar"] {display: none !important;} /* Hides the top right menu */
+    </style>
+""", unsafe_allow_html=True)
+
 if 'email' not in st.session_state:
     st.switch_page("./Login.py")  # Switch to login page if user is not logged in
     st.stop()  # Stop further execution

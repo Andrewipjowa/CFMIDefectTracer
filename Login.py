@@ -5,6 +5,15 @@ import re
 
 st.set_page_config(page_title="Defect Tracer | Login", page_icon="cfm-holdings-logo.png", layout="centered", initial_sidebar_state="expanded")
 
+st.markdown("""
+    <style>
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+        [data-testid="stToolbar"] {display: none !important;} /* Hides the top right menu */
+    </style>
+""", unsafe_allow_html=True)
+
 if 'email' in st.session_state:
     with st.sidebar:
         if st.button("Logout"):  # Logout functionality
