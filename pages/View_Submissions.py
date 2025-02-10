@@ -16,7 +16,7 @@ st.markdown("""
         header {visibility: hidden;}
         [data-testid="stToolbar"] {display: none !important;} /* Hides the top right menu */
     </style>
-""", unsafe_allow_html=False)
+""", unsafe_allow_html=True)
 
 if 'email' not in st.session_state:
     st.switch_page("./Login.py")  # Switch to login page if user is not logged in
