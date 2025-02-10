@@ -39,7 +39,7 @@ filter_options = st.session_state["existing_categories"]
 
 # VIEWING SUBMISSIONS ###################################################################
 # Check the selected filters and alter display
-def filter_display(date_filter, month_filter, year_filter, part_code_filter):
+def filter_display(date_filter, month_filter, year_filter, product_filter):
     text = ""
 
     if year_filter != "None" and month_filter == "None" and date_filter == "None":
@@ -49,7 +49,7 @@ def filter_display(date_filter, month_filter, year_filter, part_code_filter):
     elif year_filter != "None" and month_filter != "None" and date_filter != "None":
         text = f" in {date_filter} {month_filter} {year_filter}"
 
-    if part_code_filter or type_filter != "All":  # Append "that matched your filters" if part_code_filter is provided
+    if product_filter or type_filter != "All" or case_filter != "All":
         text += " that matched your filters"
     else:
         text = "Invalid"
@@ -68,11 +68,13 @@ with tab1:
     st.markdown("#### All Submissions")
 
     with st.expander("*Filter Options*", expanded=True):
-        col1, col2 = st.columns([4, 1])
+        col1, col2, col3 = st.columns([4, 1, 1])
         with col1:
-            part_code_filter = st.multiselect("**Select Specific Product(s)**", filter_options, default=None, placeholder="Select product(s)")
+            product_filter = st.multiselect("**Specific Product(s)**", filter_options, default=None, placeholder="Select product(s)")
         with col2:
-            type_filter = st.selectbox("**Select Defect Type**", ["All", "Rework", "Scrap"])
+            type_filter = st.selectbox("**Defect Type**", ["All", "Rework", "Scrap"])
+        with col3:
+            case_filter = st.selectbox("**Case Status**", ["All", "Open", "Closed"])
 
         col1, col2, col3 = st.columns([1, 1, 1])
         with col1:
@@ -92,7 +94,7 @@ with tab1:
         with col3:
             date_filter = st.selectbox("**Select Date:**", ["None"] + dates_in_month, disabled=(month_filter == "None"), help="Select a month first" if year_filter != "None" else None)
 
-    if part_code_filter or type_filter != "All" or year_filter != "None":
+    if product_filter or type_filter != "All" or year_filter != "None":
         button_name = "Filtered"
     else:
         button_name = "All"
@@ -103,7 +105,7 @@ with tab1:
             for row in all_records:  # For each row in the data
                 case_number = row['Case Number']
                 customer = row['Customer']
-                part_code = row['Part Code']
+                part_code = row['Product']
                 do_number = row['DO Number']
                 quantity = row['Quantity']
                 cost = row['Cost']
@@ -119,9 +121,9 @@ with tab1:
                 except ValueError:
                     continue  # Skip rows where the date format is incorrect
 
-                match_product = not part_code_filter or part_code in part_code_filter  # Product filtering
-
+                match_product = not product_filter or part_code in product_filter  # Product filtering
                 match_type = type_filter == "All" or row['Type'] == type_filter  # Defect type filtering
+                match_case = case_filter == "All" or row['Status'] == case_filter  # Case status filtering
 
                 # Date filtering
                 match_date = True
@@ -132,7 +134,7 @@ with tab1:
                 if date_filter != "None":
                     match_date = match_date and timestamp.day == int(date_filter)
 
-                if match_product and match_type and match_date:
+                if match_product and match_case and match_type and match_date:
                     filtered.append({
                         "Case Number": case_number,
                         "Case Status": status,
@@ -159,11 +161,11 @@ with tab1:
             if filtered_sorted:  # Display the filtered data
                 st.markdown(f"##### {str(button_name + ' Defect Submissions')}")
 
-                if filter_display(date_filter, month_filter, year_filter, part_code_filter) != "Invalid":
+                if filter_display(date_filter, month_filter, year_filter, product_filter) != "Invalid":
                     if len(filtered_sorted) == 1:
-                        st.write(f"There was 1 submission{filter_display(date_filter, month_filter, year_filter, part_code_filter)}.")
+                        st.write(f"There was 1 submission{filter_display(date_filter, month_filter, year_filter, product_filter)}.")
                     else:
-                        st.write(f"There were {len(filtered_sorted)} submissions{filter_display(date_filter, month_filter, year_filter, part_code_filter)}.")
+                        st.write(f"There were {len(filtered_sorted)} submissions{filter_display(date_filter, month_filter, year_filter, product_filter)}.")
                 else:
                     st.write("Showing the latest records as of today.")
 
@@ -172,7 +174,7 @@ with tab1:
 
             else:  # Check the selected filters and display custom messages
                 st.markdown("##### No Submissions Found")
-                st.write(f"No records found {filter_display(date_filter, month_filter, year_filter, part_code_filter)}.")
+                st.write(f"No records found {filter_display(date_filter, month_filter, year_filter, product_filter)}.")
 
 with tab2:
     case_numbers = [row['Case Number'] for row in all_records]
@@ -195,7 +197,7 @@ with tab2:
         # Displaying the details in a neat table format
         case_data = {
             "Customer": case['Customer'],
-            "Part Code": case['Part Code'],
+            "Part Code": case['Product'],
             "DO Number": case['DO Number'],
             "Quantity": case['Quantity'],
             "Cost": case['Cost'],
@@ -260,7 +262,7 @@ with tab3:
     month_df = month_df.sort_values("Month")  # Sort by month order
 
     # Get Top 3 Products with the Most Submissions
-    products = [row['Part Code'] for row in chart_records]  # Get the list of products from all records
+    products = [row['Product'] for row in chart_records]  # Get the list of products from all records
     product_count = Counter(products)  # Count occurrences of each product
     top_product_month = product_count.most_common(3)  # Get the top 3 most common products
     top_product_month_df = pd.DataFrame(top_product_month, columns=['Product', 'Submissions'])
@@ -276,7 +278,7 @@ with tab3:
     quantity_df = quantity_df.sort_values("Month")  # Sort by month order
 
     # Get Top 3 Products with Most Quantity of Defects
-    products = [row['Part Code'] for row in chart_records]  # Get the list of products from all records
+    products = [row['Product'] for row in chart_records]  # Get the list of products from all records
     product_quantity = defaultdict(int)  # Aggregate product quantities
     for m, q in zip(products, quantity):
         product_quantity[m] += q  # Sum the quantities for each product
@@ -371,7 +373,7 @@ with tab4:
     st.markdown(f"""
     #### All Submissions Guide
     ##### How to Interact:
-    - Use the dropdown menus in *Filter Options* to filter records based on product(s), defect types, year, month, and date.
+    - Use the dropdown menus in *Filter Options* to filter records based on product(s), defect types, case status, year, month, and date.
     - Click the button to view the records (and apply filters if selected).
     - Records are displayed in descending date order (most recent records are at the top).
     ##### Filtering Guide:
@@ -383,9 +385,7 @@ with tab4:
             
             - Selecting {guide_date.year-1} from **Select Year**, followed by selecting January from **Select Month**, will filter the records to display only those from January of {guide_date.year-1}.
             
-    - **I want to view submissions for a certain case number**: Case numbers are assigned based on the date and number of cases in the day. Use dropdowns for selecting year, month, and date to filter cases for a specific date.
-        - **Example:**
-            - Today's date is {guide_date.strftime('%d/%m/%Y')}, so the first defect submission today will be assigned case number {guide_date.strftime('%d%m%Y')}-01, the second submission today will be {guide_date.strftime('%d%m%Y')}-02, the first submission for tomorrow ({(guide_date + timedelta(days=1)).strftime('%d/%m/%Y')}) will be {(guide_date + timedelta(days=1)).strftime('%d%m%Y')}-01.
+    - **I want to view submissions for a certain case number**: Go to "Specific Submission" tab.
     
     ---
     
