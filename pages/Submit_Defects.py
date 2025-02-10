@@ -18,13 +18,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Set up Google Credentials using Streamlit secrets
-google_credentials_json = st.secrets["google_sheets"]["credentials_json"]
-
-clean_credentials = re.sub(r'[^\x00-\x7F]+', '', google_credentials_json)  # Clean the credentials
-
-credentials_dict = json.loads(clean_credentials, strict=False)  # Convert the credentials JSON string back into a dictionary
-
 if 'email' not in st.session_state:
     st.switch_page("./Login.py")  # Switch to login page if user is not logged in
     st.stop()  # Stop further execution
@@ -38,6 +31,10 @@ else:
 
 
 # OPEN THE GOOGLE SPREADSHEET & SET UP LOCAL CACHE ######################################
+
+google_credentials_json = st.secrets["google_sheets"]["credentials_json"]  # Set up Google Credentials using Streamlit secrets
+clean_credentials = re.sub(r'[^\x00-\x7F]+', '', google_credentials_json)  # Clean the credentials
+credentials_dict = json.loads(clean_credentials, strict=False)  # Convert the credentials JSON string back into a dictionary
 
 # Define the scope of the app (access to Sheets and Drive)
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -80,35 +77,39 @@ def submit_defect(data_to_append):
     data_to_append.insert(0, case_number)  # Insert case number at the start of the data
     st.session_state["sheet1"].append_row(data_to_append)
     # Update local cache
-    st.session_state["sheet1_records"].append(dict(zip(["Case Number", "Product", "DO Number", "Quantity", "Cost", "Type", "Description", "Action", "Submitter", "Timestamp"], data_to_append)))
+    st.session_state["sheet1_records"].append(dict(zip(["Case Number", "Customer", "Part Code", "DO Number", "Quantity", "Cost", "Type", "Description", "Action", "Submitter", "Timestamp", "Status"], data_to_append)))
 
 
 # SUBMIT DEFECTS ########################################################################
-def validate_inputs(option, new_category, do_number, quantity, cost, description, action, submitter, checkbox):
+def validate_inputs(customer, option, new_category, do_number, quantity, cost, description, action, submitter, checkbox):
     errors = []
     existing_categories = st.session_state["existing_categories"]
 
-    if option == "No Product":
-        errors.append("Select a product is required.")
-    if option == "Add New Product":
+    if not customer.strip():
+        errors.append("Customer is required.")
+    elif not re.match(r"^(?=.*[A-Za-z0-9]).*$", customer):
+        errors.append("Customer cannot have no letters or numbers.")
+    if option == "No Part Code":
+        errors.append("Select a Part Code is required.")
+    if option == "Add New Part Code":
         if not new_category:
-            errors.append("Either select a product or enter a new product name.")
+            errors.append("Either select a Part Code or enter a new Part Code.")
         elif new_category.lower() in [category.lower() for category in existing_categories]:
-            errors.append("New product name entered already exists.")
+            errors.append("New Part Code entered already exists.")
         elif new_category.lower() in ["none"]:
-            errors.append("New product name is invalid.")
+            errors.append("New Part Code is invalid.")
         elif not re.search(r"[A-Za-z0-9]", new_category):  # Ensures at least one letter or number
-            errors.append("New product name cannot have no letters or numbers.")
-    elif option == "No Product" and new_category:
-        errors.append("Either select a product or enter a new product name.")
+            errors.append("New Part Code cannot have no letters or numbers.")
+    elif option == "No Part Code" and new_category:
+        errors.append("Either select a Part Code or enter a new Part Code.")
     if not do_number.strip():
         errors.append("DO number is required.")
     elif not re.match(r"^(?=.*[A-Za-z0-9]).*$", do_number):
         errors.append("DO Number cannot have no letters or numbers.")
     if quantity == 0 and cost == 0:
-        errors.append("Invalid quantity of defective products and unit cost.")
+        errors.append("Invalid quantity and unit cost.")
     elif quantity == 0:
-        errors.append("Invalid quantity of defective products.")
+        errors.append("Invalid quantity.")
     elif cost == 0:
         errors.append("Invalid unit cost.")
     if not description.strip() and not action.strip():
@@ -140,15 +141,15 @@ def is_duplicate_submission(data_to_check):
         row_date = datetime.strptime(row["Timestamp"], "%d/%m/%Y %H:%M:%S").strftime("%d/%m/%Y")
 
         if (row_date == today
-                and row["Product"] == data_to_check[0]
-                and row["DO Number"] == data_to_check[1]
-                and row["Quantity"] == data_to_check[2]
-                and row["Cost"] == data_to_check[3]
-                and row["Type"] == data_to_check[4]
-                and row["Description"] == data_to_check[5]
-                and row["Action"] == data_to_check[6]
-                and row["Submitter"] == data_to_check[7]
-                and row_date == data_to_check[8][:10]):
+                and row["Customer"] == data_to_check[0]
+                and row["Part Code"] == data_to_check[1]
+                and row["DO Number"] == data_to_check[2]
+                and row["Quantity"] == data_to_check[3]
+                and row["Type"] == data_to_check[5]
+                and row["Description"] == data_to_check[6]
+                and row["Action"] == data_to_check[7]
+                and row["Submitter"] == data_to_check[8]
+                and row_date == data_to_check[9][:10]):
             return True  # Duplicate found
     return False  # Duplicate not found
 
@@ -158,20 +159,25 @@ st.subheader("Submit A Defect")
 tab1, tab2 = st.tabs(["Submit A Defect", "Help/Guide"])
 
 with tab1:
+
     col1, col2 = st.columns(2)
     with col1:
-        option = st.selectbox("**Select a Product:**", ["No Product", "Add New Product"] + st.session_state["existing_categories"], help="To add a new product not in the list, select the 'Add New Product' option.")
+        customer = st.text_input("**Customer:**", max_chars=50, placeholder="Enter customer")
+    with col2:
+        do_number = st.text_input("**DO Number:**", max_chars=50, placeholder="Enter DO number", help="Delivery order reference number")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        option = st.selectbox("**Select Part Code:**", ["No Part Code", "Add New Part Code"] + st.session_state["existing_categories"], help="To add a new Part Code not in the list, select the 'Add New Part Code' option.")
         new_category = ""
-        if option == "Add New Product":
-            new_category = st.text_input("**Add New Product:**", max_chars=50, placeholder="Enter new product name", help="Make sure not to enter the name of an existing product.")
+    with col2:
+        if option == "Add New Part Code":
+            new_category = st.text_input("**Add New Part Code:**", max_chars=50, placeholder="Enter new part code", help="Make sure not to enter an existing Part Code.")
             new_category = new_category.title()
 
-    with col2:
-        do_number = st.text_input("**DO Number**", max_chars=50, placeholder="Enter DO number", help="Delivery order reference number")
-
     col1, col2 = st.columns(2)
     with col1:
-        quantity = st.number_input("**Quantity of Defective Products:**", min_value=0, max_value=1000, step=1, format="%d", placeholder="Enter the number defective products")
+        quantity = st.number_input("**Quantity:**", min_value=0, max_value=1000, step=1, format="%d", placeholder="Enter the quantity")
     with col2:
         cost = st.number_input("**Unit Cost ($):**", min_value=0.0, max_value=5000.0, step=0.01, format="%.2f", placeholder="Enter unit price")
 
@@ -187,7 +193,7 @@ with tab1:
 
     # Handle Submission
     if st.button("Submit"):
-        errors = validate_inputs(option, new_category, do_number, quantity, cost, description, action, submitter, checkbox)
+        errors = validate_inputs(customer, option, new_category, do_number, quantity, cost, description, action, submitter, checkbox)
         if errors:
             if len(errors) > 1:
                 error_message = "\n".join(f"{i+1}. {error}" for i, error in enumerate(errors))  # Numbering errors
@@ -195,12 +201,12 @@ with tab1:
                 error_message = errors[0]  # Single error, no numbering
             st.error(error_message)
         else:
-            if option == "Add New Product":  # If user adds a new product, add to existing_categories cache and Sheet 2
-                data_to_append = [new_category, do_number, quantity, f"{total_price:.2f}", defect_type, description, action, submitter, datetime.now().strftime("%d/%m/%Y %H:%M:%S")]
-                st.session_state["sheet2"].append_row([new_category])  # Add new product to the categories
+            if option == "Add New Part Code":  # If user adds a new Part Code, add to existing_categories cache and Sheet 2
+                data_to_append = [customer, new_category, do_number, quantity, total_price, defect_type, description, action, submitter, datetime.now().strftime("%d/%m/%Y %H:%M:%S"), "Open"]
+                st.session_state["sheet2"].append_row([new_category])  # Add new Part Code to the categories
                 st.session_state["existing_categories"].append(new_category)  # Update local cache
-            else:  # User selects a product from dropdown
-                data_to_append = [option, do_number, quantity, total_price, defect_type, description, action, submitter, datetime.now().strftime("%d/%m/%Y %H:%M:%S")]
+            else:  # User selects a Part Code from dropdown
+                data_to_append = [customer, option, do_number, quantity, total_price, defect_type, description, action, submitter, datetime.now().strftime("%d/%m/%Y %H:%M:%S"), "Open"]
 
             if is_duplicate_submission(data_to_append):  # If user submits the exact same submission on the same day
                 st.error("This submission already exists. Please do not submit a duplicate.")
@@ -215,19 +221,21 @@ with tab1:
 with tab2:
     st.markdown(f"""
     #### Defect Submission Guide
-    - **Step 1 - Enter Product Name:** Choose a product from the list in **Select a Product**. To add a new product to the list, choose the 'Add New Product' option and enter its name in **Add New Product**. The maximum number of characters allowed is 50. You cannot enter a product name that already exists.
+    - **Step 1 - Enter Customer:** Enter customer in **Customer**. The maximum number of characters allowed is 50. This is required.
     
     - **Step 2 - Enter DO Number:** Enter the delivery order reference number in **DO Number**. The maximum number of characters allowed is 50. This is required.
     
-    - **Step 3 - Enter Quantity and Unit Cost:** Using the number inputs, enter the quantity in **Quantity of Defect Products** and unit cost in **Unit Cost ($)**. If both entered, the total cost (quantity x unit cost) will be displayed. Both the quantity and unit cost cannot be zero.
+    - **Step 3 - Enter Part Code:** Choose a Part Code from the list in **Select Part Code**. To add a new Part Code to the list, choose the 'Add New Part Code' option and enter its in **Add New Part Code**. The maximum number of characters allowed is 50. You cannot enter a Part Code that already exists.
     
-    - **Step 4 - Classify the Defect:** Choose either "Rework" or "Scrap" from **Select Defect Type**. 
+    - **Step 4 - Enter Quantity and Unit Cost:** Using the number inputs, enter the quantity in **Quantity** and unit cost in **Unit Cost ($)**. If both entered, the total cost (quantity x unit cost) will be displayed. Both the quantity and unit cost cannot be zero.
     
-    - **Step 5 - Describe the Defect(s) and Action(s) Taken:** Go into detail on the defects and actions taken in **Description of Defect(s)** and **Description of Action(s) Taken**. The maximum number of characters allowed is 300. Both descriptions are required.
+    - **Step 5 - Classify the Defect:** Choose either "Rework" or "Scrap" from **Select Defect Type**. 
     
-    - **Step 6 - Enter Submitter:** Enter the submitter's name in **Submitter**. The maximum number of characters allowed is 50. This is required.
+    - **Step 6 - Describe the Defect(s) and Action(s) Taken:** Go into detail on the defects and actions taken in **Description of Defect(s)** and **Description of Action(s) Taken**. The maximum number of characters allowed is 300. Both descriptions are required.
     
-    - **Step 7 - Check the Checkbox:** By checking the checkbox, you are sure that your submission is correct and cannot be altered after submission. This is required.
+    - **Step 7 - Enter Submitter:** Enter the submitter's name in **Submitter**. The maximum number of characters allowed is 50. This is required.
     
-    - **Step 8 - Submit Defect:** Finally, click on **Submit** to add your entry. The time of submission will be recorded. Do not submit the same entry twice.
+    - **Step 8 - Check the Checkbox:** By checking the checkbox, you are sure that your submission is correct and cannot be altered after submission. This is required.
+    
+    - **Step 9 - Submit Defect:** Finally, click on **Submit** to add your entry. The time of submission will be recorded. Do not submit the same entry twice.
     """)

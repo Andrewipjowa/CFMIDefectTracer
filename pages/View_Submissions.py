@@ -39,21 +39,20 @@ filter_options = st.session_state["existing_categories"]
 
 # VIEWING SUBMISSIONS ###################################################################
 # Check the selected filters and alter display
-def filter_display(date_filter, month_filter, year_filter, product_filter):
+def filter_display(date_filter, month_filter, year_filter, part_code_filter):
     text = ""
 
     if year_filter != "None" and month_filter == "None" and date_filter == "None":
-        text = f"{year_filter}"
+        text = f" in {year_filter}"
     elif year_filter != "None" and month_filter != "None" and date_filter == "None":
-        text = f"{month_filter} {year_filter}"
+        text = f" in {month_filter} {year_filter}"
     elif year_filter != "None" and month_filter != "None" and date_filter != "None":
-        text = f"{date_filter} {month_filter} {year_filter}"
+        text = f" in {date_filter} {month_filter} {year_filter}"
+
+    if part_code_filter or type_filter != "All":  # Append "that matched your filters" if part_code_filter is provided
+        text += " that matched your filters"
     else:
         text = "Invalid"
-
-    # Append "that matched your filters" if product_filter is provided
-    if product_filter or type_filter != "All":
-        text += " that matched your filters"
 
     return text
 
@@ -63,15 +62,15 @@ years_with_data = [str(year) for year in (sorted(set(years), reverse=True))]  # 
 
 st.subheader("View Defect Submissions")
 
-tab1, tab2, tab3 = st.tabs(["Table Visualization", "Chart Visualization", "Help/Guide"])
+tab1, tab2, tab3, tab4 = st.tabs(["All Submissions", "Specific Submission", "Chart Visualization", "Help/Guide"])
 
 with tab1:
-    st.markdown("#### Table Visualization")
+    st.markdown("#### All Submissions")
 
     with st.expander("*Filter Options*", expanded=True):
         col1, col2 = st.columns([4, 1])
         with col1:
-            product_filter = st.multiselect("**Select Specific Product(s)**", filter_options, default=None, placeholder="Select product(s)")
+            part_code_filter = st.multiselect("**Select Specific Product(s)**", filter_options, default=None, placeholder="Select product(s)")
         with col2:
             type_filter = st.selectbox("**Select Defect Type**", ["All", "Rework", "Scrap"])
 
@@ -93,7 +92,7 @@ with tab1:
         with col3:
             date_filter = st.selectbox("**Select Date:**", ["None"] + dates_in_month, disabled=(month_filter == "None"), help="Select a month first" if year_filter != "None" else None)
 
-    if product_filter or type_filter != "All" or year_filter != "None":
+    if part_code_filter or type_filter != "All" or year_filter != "None":
         button_name = "Filtered"
     else:
         button_name = "All"
@@ -103,22 +102,24 @@ with tab1:
             filtered = []  # Empty list to store filtered data
             for row in all_records:  # For each row in the data
                 case_number = row['Case Number']
-                product = row['Product']
+                customer = row['Customer']
+                part_code = row['Part Code']
                 do_number = row['DO Number']
                 quantity = row['Quantity']
                 cost = row['Cost']
-                type = row['Type']
+                defect_type = row['Type']
                 description = row['Description']
                 action = row['Action']
                 submitter = row['Submitter']
                 timestamp = row['Timestamp']
+                status = row['Status']
 
                 try:  # Convert the Timestamp to datetime format
                     timestamp = datetime.strptime(timestamp, "%d/%m/%Y %H:%M:%S")
                 except ValueError:
                     continue  # Skip rows where the date format is incorrect
 
-                match_product = not product_filter or product in product_filter  # Product filtering
+                match_product = not part_code_filter or part_code in part_code_filter  # Product filtering
 
                 match_type = type_filter == "All" or row['Type'] == type_filter  # Defect type filtering
 
@@ -134,11 +135,13 @@ with tab1:
                 if match_product and match_type and match_date:
                     filtered.append({
                         "Case Number": case_number,
-                        "Product": product,
+                        "Case Status": status,
+                        "Customer": customer,
+                        "Part Code": part_code,
                         "DO Number": str(do_number),
                         "Quantity": str(quantity),
                         "Cost ($)": f"{float(cost):.2f}",
-                        "Defect Type": type,
+                        "Defect Type": defect_type,
                         "Defect Description": description,
                         "Action Taken": action,
                         "Submitter": submitter,
@@ -156,11 +159,11 @@ with tab1:
             if filtered_sorted:  # Display the filtered data
                 st.markdown(f"##### {str(button_name + ' Defect Submissions')}")
 
-                if filter_display(date_filter, month_filter, year_filter, product_filter) != "Invalid":
+                if filter_display(date_filter, month_filter, year_filter, part_code_filter) != "Invalid":
                     if len(filtered_sorted) == 1:
-                        st.write(f"There was 1 submission in {filter_display(date_filter, month_filter, year_filter, product_filter)}.")
+                        st.write(f"There was 1 submission{filter_display(date_filter, month_filter, year_filter, part_code_filter)}.")
                     else:
-                        st.write(f"There were {len(filtered_sorted)} submissions in {filter_display(date_filter, month_filter, year_filter, product_filter)}.")
+                        st.write(f"There were {len(filtered_sorted)} submissions{filter_display(date_filter, month_filter, year_filter, part_code_filter)}.")
                 else:
                     st.write("Showing the latest records as of today.")
 
@@ -169,9 +172,69 @@ with tab1:
 
             else:  # Check the selected filters and display custom messages
                 st.markdown("##### No Submissions Found")
-                st.write(f"No records found in {filter_display(date_filter, month_filter, year_filter, product_filter)}.")
+                st.write(f"No records found {filter_display(date_filter, month_filter, year_filter, part_code_filter)}.")
 
 with tab2:
+    case_numbers = [row['Case Number'] for row in all_records]
+    case_numbers.reverse()
+
+    st.markdown("#### Specific Submission")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        search_case = st.selectbox("**Search Case Number:**", ["None"] + case_numbers)
+        st.write("")
+
+
+    if search_case != "None":
+        case_records = [row for row in all_records if row['Case Number'] == search_case]  # Filter records for the selected case number
+        case = case_records[0]  # Assuming only one record per case
+
+        case_status = case['Status']
+
+        # Displaying the details in a neat table format
+        case_data = {
+            "Customer": case['Customer'],
+            "Part Code": case['Part Code'],
+            "DO Number": case['DO Number'],
+            "Quantity": case['Quantity'],
+            "Cost": case['Cost'],
+            "Defect Type": case['Type'],
+            "Description": case['Description'],
+            "Action": case['Action'],
+            "Submitter": case['Submitter'],
+            "Submission Date": case['Timestamp'][:10]
+        }
+
+        st.markdown(f"##### Viewing Case #{search_case} [Case Status: {case_status}]")
+        # Display in a table format
+        st.table(case_data)
+
+        if case_status == "Open":
+            st.write("##### Mark Case as Closed")
+            checkbox = st.checkbox("I understand that closing a case is irreversible.")
+            if st.button("Mark as Closed"):
+                if not checkbox:
+                    st.error("Check the checkbox first.")
+                else:
+                    # Update status to closed in all_records
+                    for row in all_records:
+                        if row['Case Number'] == search_case:
+                            row['Status'] = "Closed"
+
+                    # Update the status in Google Sheets (sheet1)
+                    sheet1 = st.session_state["sheet1"]
+                    cell = sheet1.find(search_case)  # Find the cell with the case number
+                    if cell:
+                        sheet1.update_cell(cell.row, 12, "Closed")  # Update the status in Status (column 12 of sheet)
+
+                        placeholder = st.empty()
+                        placeholder.info(f"Case closed successfully.")
+                        sleep(3)
+                        placeholder.empty()
+                        st.switch_page("pages/View_Submissions.py")
+
+with tab3:
     years_with_data = sorted(set(datetime.strptime(row['Timestamp'], "%d/%m/%Y %H:%M:%S").year for row in all_records), reverse=True)
 
     st.markdown("#### Chart Visualization")
@@ -196,10 +259,10 @@ with tab2:
     month_df['Month'] = pd.Categorical(month_df['Month'], categories=month_order, ordered=True)  # Ensure months are treated as categories (January to December)
     month_df = month_df.sort_values("Month")  # Sort by month order
 
-    # Get Top 5 Products with the Most Submissions
-    products = [row['Product'] for row in chart_records]  # Get the list of products from all records
+    # Get Top 3 Products with the Most Submissions
+    products = [row['Part Code'] for row in chart_records]  # Get the list of products from all records
     product_count = Counter(products)  # Count occurrences of each product
-    top_product_month = product_count.most_common(5)  # Get the top 5 most common products
+    top_product_month = product_count.most_common(3)  # Get the top 3 most common products
     top_product_month_df = pd.DataFrame(top_product_month, columns=['Product', 'Submissions'])
 
     # Get Total Defect Quantity per Month
@@ -212,13 +275,13 @@ with tab2:
     quantity_df['Month'] = pd.Categorical(quantity_df['Month'], categories=month_order, ordered=True)  # Ensure months are treated as categories
     quantity_df = quantity_df.sort_values("Month")  # Sort by month order
 
-    # Get Top 5 Products with Most Quantity of Defects
-    products = [row['Product'] for row in chart_records]  # Get the list of products from all records
+    # Get Top 3 Products with Most Quantity of Defects
+    products = [row['Part Code'] for row in chart_records]  # Get the list of products from all records
     product_quantity = defaultdict(int)  # Aggregate product quantities
     for m, q in zip(products, quantity):
         product_quantity[m] += q  # Sum the quantities for each product
     product_quantity = Counter(product_quantity)
-    top_product_quantity = product_quantity.most_common(5)  # Get the top 5 most common products
+    top_product_quantity = product_quantity.most_common(3)  # Get the top 3 most common products
     top_product_quantity_df = pd.DataFrame(top_product_quantity, columns=['Product', 'Quantity'])
 
     if selected_chart == "Number of Submissions":
@@ -226,7 +289,7 @@ with tab2:
 
         # Graph for: Total Number of Submissions per Month
         chart1 = ax1.bar(month_df['Month'], month_df['Submissions'])
-        ax1.set_title(f"Total Number of Submissions per Month in {selected_year}", fontsize=18, fontweight='bold', fontname='Calibri', pad=15)
+        ax1.set_title(f"Total Number of Submissions per Month in {selected_year}", fontsize=18, fontweight='bold', fontname='Calibri', pad=13)
         ax1.yaxis.get_major_locator().set_params(integer=True)  # Ensure y-axis shows whole numbers only
 
         # Setting x-axis and y-axis fonts and sizes
@@ -240,11 +303,11 @@ with tab2:
         # Include the values of each bar if value != 0
         for bar in chart1:
             if bar.get_height() != 0:  # Check if the height of the bar is not 0 and then place the bar value above the bar
-                ax1.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.05, str(int(bar.get_height())), ha='center', va='bottom', fontsize=14, fontname='Calibri')
+                ax1.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.03, str(int(bar.get_height())), ha='center', va='bottom', fontsize=14, fontname='Calibri')
 
-        # Graph for: Top 5 Products with the Most Submissions
+        # Graph for: Top 3 Products with the Most Submissions
         chart2 = ax2.bar(top_product_month_df['Product'], top_product_month_df['Submissions'])
-        ax2.set_title(f"Top 5 Products with the Most Submissions in {selected_year}", fontsize=19, fontweight='bold', fontname='Calibri', pad=15)
+        ax2.set_title(f"Top 3 Products with the Most Submissions in {selected_year}", fontsize=19, fontweight='bold', fontname='Calibri', pad=13)
         ax2.yaxis.get_major_locator().set_params(integer=True)  # Ensure y-axis shows whole numbers only
 
         # Setting x-axis and y-axis fonts and sizes
@@ -266,7 +329,7 @@ with tab2:
         fig, (ax3, ax4) = plt.subplots(2, 1, figsize=(10, 10))  # 2 rows and 1 column
         # Graph for: Total Defect Quantity per Month
         chart3 = ax3.bar(quantity_df['Month'], quantity_df['Quantity'], color='skyblue')
-        ax3.set_title(f"Total Defect Quantity per Month in {selected_year}", fontsize=19, fontweight='bold', fontname='Calibri', pad=15)
+        ax3.set_title(f"Total Defect Quantity per Month in {selected_year}", fontsize=19, fontweight='bold', fontname='Calibri', pad=13)
         ax3.yaxis.get_major_locator().set_params(integer=True)  # Ensure y-axis shows whole numbers only
 
         # Setting x-axis and y-axis fonts and sizes
@@ -280,11 +343,11 @@ with tab2:
         # Include the values of each bar if value != 0
         for bar in chart3:
             if bar.get_height() != 0:  # Check if the height of the bar is not 0 and then place the bar value above the bar
-                ax3.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.05, str(int(bar.get_height())), ha='center', va='bottom', fontsize=14, fontname='Calibri')
+                ax3.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.03, str(int(bar.get_height())), ha='center', va='bottom', fontsize=14, fontname='Calibri')
 
-        # Graph for: Top 5 Products with Most Quantity of Defects
+        # Graph for: Top 3 Products with Most Quantity of Defects
         chart4 = ax4.bar(top_product_quantity_df['Product'], top_product_quantity_df['Quantity'], color='skyblue')
-        ax4.set_title(f"Top 5 Products with the Most Quantity of Defects in {selected_year}", fontsize=19, fontweight='bold', fontname='Calibri', pad=15)
+        ax4.set_title(f"Top 3 Products with the Most Quantity of Defects in {selected_year}", fontsize=19, fontweight='bold', fontname='Calibri', pad=13)
         ax4.yaxis.get_major_locator().set_params(integer=True)  # Ensure y-axis shows whole numbers only
 
         # Setting x-axis and y-axis fonts and sizes
@@ -302,11 +365,11 @@ with tab2:
         plt.subplots_adjust(hspace=0.4)
         st.pyplot(fig)
 
-with tab3:
+with tab4:
     guide_date = datetime.now()
 
     st.markdown(f"""
-    #### Table Visualization Guide
+    #### All Submissions Guide
     ##### How to Interact:
     - Use the dropdown menus in *Filter Options* to filter records based on product(s), defect types, year, month, and date.
     - Click the button to view the records (and apply filters if selected).
@@ -326,6 +389,13 @@ with tab3:
     
     ---
     
+    #### Specific Submission Guide
+    ##### How to Interact:
+    - Use the **Search Case Number** to view all the details of a specific submission.
+    - If the case status is 'Open', the **Mark as Closed** button will appear. Click on the button to close the case (this action is irreversible).
+    
+    ---
+    
     #### Chart Visualization Guide
     ##### How to Interact:
     - Use the dropdown menus in *Filter Options* to filter records based on year and chart category.
@@ -337,7 +407,7 @@ with tab3:
                 
                 Total defect quantity in February = 5 + 3 + 2 = 10.
             
-    - **Top 5 Products with the Highest Defect Quantities**: This bar chart displays the top 5 products with the highest quantity of defects in the year.
+    - **Top 3 Products with the Highest Defect Quantities**: This bar chart displays the top 3 products with the highest quantity of defects in the year.
     - **Number of Submissions per Month**: This bar chart displays the sum of all submissions each month, regardless of the product.
     
         - **Example:** 
@@ -345,5 +415,5 @@ with tab3:
             
                 Number of submissions in February = 1 + 1 + 1 = 3. 
             
-    - **Top 5 Products with the Most Submissions**: This bar chart displays the top 5 products with the most number of submissions in the year.
+    - **Top 3 Products with the Most Submissions**: This bar chart displays the top 3 products with the most number of submissions in the year.
     """)
