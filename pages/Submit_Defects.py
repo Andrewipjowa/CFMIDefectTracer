@@ -81,7 +81,7 @@ def submit_defect(data_to_append):
     data_to_append.insert(0, case_number)  # Insert case number at the start of the data
     st.session_state["sheet1"].append_row(data_to_append)
     # Update local cache
-    st.session_state["sheet1_records"].append(dict(zip(["Case Number", "Customer", "Product", "DO Number", "Quantity", "Cost", "Type", "Description", "Action", "Submitter", "Timestamp", "Status"], data_to_append)))
+    st.session_state["sheet1_records"].append(dict(zip(["Case Number", "Customer", "Product", "DO Number", "Quantity", "Cost", "Type", "Description", "Action", "Submitter", "Timestamp", "Status", "Comments"], data_to_append)))
 
 
 # SUBMIT DEFECTS ########################################################################
@@ -203,11 +203,11 @@ with tab1:
             st.error(error_message)
         else:
             if option == "Add New Part Code":  # If user adds a new product, add to existing_categories cache and Sheet 2
-                data_to_append = [customer, new_category, do_number, quantity, total_price, defect_type, description, action, submitter, datetime.now().strftime("%d/%m/%Y %H:%M:%S"), "Open"]
+                data_to_append = [customer, new_category, do_number, quantity, total_price, defect_type, description, action, submitter, datetime.now().strftime("%d/%m/%Y %H:%M:%S"), "Open", "No Comments"]
                 st.session_state["sheet2"].append_row([new_category])  # Add new product to the categories
                 st.session_state["existing_categories"].append(new_category)  # Update local cache
             else:  # User selects a product from dropdown
-                data_to_append = [customer, option, do_number, quantity, total_price, defect_type, description, action, submitter, datetime.now().strftime("%d/%m/%Y %H:%M:%S"), "Open"]
+                data_to_append = [customer, option, do_number, quantity, total_price, defect_type, description, action, submitter, datetime.now().strftime("%d/%m/%Y %H:%M:%S"), "Open", "No Comments"]
 
             if is_duplicate_submission(data_to_append):  # If user submits the exact same submission on the same day
                 st.error("This submission already exists. Please do not submit a duplicate.")
