@@ -34,7 +34,8 @@ if "existing_categories" not in st.session_state:
     st.stop()
 
 # GET DATA FROM LOCAL CACHE #############################################################
-all_records = st.session_state["sheet1_records"]
+# Only get records submitted by the user
+all_records = [row for row in st.session_state["sheet1_records"] if row["Account"] == st.session_state.get("email")]
 filter_options = st.session_state["existing_categories"]
 
 
@@ -53,7 +54,7 @@ def filter_display(date_filter, month_filter, year_filter, product_filter):
     if product_filter or type_filter != "All" or case_filter != "All":
         text += " that matched your filters"
     else:
-        text = "Invalid"
+        text = ""
 
     return text
 
@@ -103,6 +104,8 @@ with tab1:
     if st.button(f"View {button_name} Submissions"):
         with st.spinner('Searching data...'):
             filtered = []  # Empty list to store filtered data
+            user_email = st.session_state.get("email")  # Get the logged-in user's email
+
             for row in all_records:  # For each row in the data
                 case_number = row['Case Number']
                 customer = row['Customer']
@@ -117,11 +120,13 @@ with tab1:
                 timestamp = row['Timestamp']
                 status = row['Status']
                 comments = row['Comments']
+                account = row['Account']
 
                 try:  # Convert the Timestamp to datetime format
                     timestamp = datetime.strptime(timestamp, "%d/%m/%Y %H:%M:%S")
                 except ValueError:
                     continue  # Skip rows where the date format is incorrect
+
 
                 match_product = not product_filter or part_code in product_filter  # Product filtering
                 match_type = type_filter == "All" or row['Type'] == type_filter  # Defect type filtering
