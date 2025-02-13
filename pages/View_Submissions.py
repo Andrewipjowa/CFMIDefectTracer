@@ -119,7 +119,6 @@ with tab1:
                 submitter = row['Submitter']
                 timestamp = row['Timestamp']
                 status = row['Status']
-                comments = row['Comments']
                 account = row['Account']
 
                 try:  # Convert the Timestamp to datetime format
@@ -154,7 +153,6 @@ with tab1:
                         "Action Taken": action,
                         "Submitter": submitter,
                         "Case Status": status,
-                        "Case Comments": comments,
                         "Timestamp": timestamp})
 
             filtered_sorted = sorted(filtered, key=lambda x: x['Timestamp'], reverse=True)  # Sort data in reverse order based on the datetime
@@ -205,6 +203,8 @@ with tab2:
 
         case_status = case['Status']
         case_comments = case['Comments']
+        case_closed_by = case['Closed By']
+        case_closed_date = case['Date Closed']
 
         # Displaying the details in a neat table format
         case_data = {
@@ -227,10 +227,16 @@ with tab2:
         if case_status == "Open":
             st.write("##### Mark Case as Closed")
             add_comment = st.text_area("**Additional Comments:** (max. 300 characters, optional)", max_chars=300, placeholder="Enter any additional comments before closing the case")
+            closed_by = st.text_input("**Case Closed By:**", max_chars=50, placeholder="Enter name here")
             checkbox = st.checkbox("I understand that closing a case is irreversible.")
+
             if st.button("Mark as Closed"):
                 if add_comment.strip() and not re.match(r"^(?=.*[A-Za-z0-9]).*$", add_comment):
                     st.error("Additional comments cannot have no letters or numbers.")
+                elif not closed_by.strip():
+                    st.error("Enter name in case closed by.")
+                elif not re.match(r"^(?=.*[A-Za-z0-9]).*$", closed_by):
+                    st.error("Name cannot have no letters or numbers.")
                 elif not checkbox:
                     st.error("Check the checkbox first.")
                 else:
@@ -239,6 +245,8 @@ with tab2:
                         if row['Case Number'] == search_case:
                             row['Status'] = "Closed"
                             row['Comments'] = add_comment
+                            row['Closed By'] = closed_by
+                            row['Date Closed'] = datetime.now().strftime("%d/%m/%Y")
 
                     # Update the status in Google Sheets (sheet1)
                     sheet1 = st.session_state["sheet1"]
@@ -246,6 +254,8 @@ with tab2:
                     if cell:
                         sheet1.update_cell(cell.row, 12, "Closed")  # Update the Status in Google Sheet (column 12 of sheet)
                         sheet1.update_cell(cell.row, 13, add_comment)  # Update the Comments in Google Sheet (column 13 of sheet)
+                        sheet1.update_cell(cell.row, 14, closed_by)  # Update the Closed By in Google Sheet (column 14 of sheet)
+                        sheet1.update_cell(cell.row, 15, datetime.now().strftime("%d/%m/%Y"))  # Update the Date Closed in Google Sheet (column 15 of sheet)
 
                         placeholder = st.empty()
                         placeholder.info(f"Case closed successfully.")
@@ -253,7 +263,9 @@ with tab2:
                         placeholder.empty()
                         st.switch_page("pages/View_Submissions.py")
         else:
+            st.write(f"##### Case closed on {case_closed_date} by {case_closed_by}.")
             st.write(f"**Case Comments:** {case_comments}")
+
 
 with tab3:
     years_with_data = sorted(set(datetime.strptime(row['Timestamp'], "%d/%m/%Y %H:%M:%S").year for row in all_records), reverse=True)
@@ -370,6 +382,7 @@ with tab4:
             - Selecting {guide_date.year-1} from **Select Year**, followed by selecting January from **Select Month**, will filter the records to display only those from January of {guide_date.year-1}.
             
     - **I want to view submissions for a certain case number**: Go to 'Specific Submission' tab.
+    - **I want to close a case**: Go to 'Specific Submission' tab.
     
     ---
     
@@ -377,7 +390,7 @@ with tab4:
     ##### How to Interact:
     - Use the **Search Case Number** to view all the details of a specific submission.
     - If the case status is 'Open', the 'Mark Case as Closed' section will appear.
-    - Before closing a case, you can add comments in **Additional Comments**.
+    - Before closing a case, you can add comments in **Additional Comments** (optional), and the name of the person who closed the case in **Case Closed By** (required).
     - Click on **Mark as Closed** to close the case (this action is irreversible).
     
     ---

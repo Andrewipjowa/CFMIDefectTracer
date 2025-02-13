@@ -2,7 +2,6 @@ import streamlit as st
 from datetime import datetime
 from time import sleep
 import gspread
-from google.oauth2 import service_account
 from google.oauth2.service_account import Credentials
 import re
 import json
@@ -81,7 +80,7 @@ def submit_defect(data_to_append):
     data_to_append.insert(0, case_number)  # Insert case number at the start of the data
     st.session_state["sheet1"].append_row(data_to_append)
     # Update local cache
-    st.session_state["sheet1_records"].append(dict(zip(["Case Number", "Customer", "Product", "DO Number", "Quantity", "Cost", "Type", "Description", "Action", "Submitter", "Timestamp", "Status", "Comments", "Account"], data_to_append)))
+    st.session_state["sheet1_records"].append(dict(zip(["Case Number", "Customer", "Product", "DO Number", "Quantity", "Cost", "Type", "Description", "Action", "Submitter", "Timestamp", "Status", "Comments", "Closed By", "Date Closed", "Account"], data_to_append)))
 
 
 # SUBMIT DEFECTS ########################################################################
@@ -189,7 +188,7 @@ with tab1:
     defect_type = st.radio("**Select Defect Type:**", ["Rework", "Scrap"], captions=["Parts can be replaced", "Totally unusable"], horizontal=True)
     description = st.text_area("**Description of Defect(s):** (max. 300 characters)", max_chars=300, placeholder="Go into detail on the defect")
     action = st.text_area("**Description of Action(s) Taken:** (max. 300 characters)", max_chars=300, placeholder="Go into detail on the action(s) taken")
-    submitter = st.text_input("**Submitter:**", max_chars=50, placeholder="Enter name of submitter")
+    submitter = st.text_input("**Submitter:**", max_chars=50, placeholder="Enter name here")
     checkbox = st.checkbox("I understand that this submission is final and cannot be edited or deleted.")
 
     # Handle Submission
@@ -203,11 +202,11 @@ with tab1:
             st.error(error_message)
         else:
             if option == "Add New Part Code":  # If user adds a new product, add to existing_categories cache and Sheet 2
-                data_to_append = [customer, new_category, do_number, quantity, total_price, defect_type, description, action, submitter, datetime.now().strftime("%d/%m/%Y %H:%M:%S"), "Open", "No Comments", st.session_state["email"]]
+                data_to_append = [customer, new_category, do_number, quantity, total_price, defect_type, description, action, submitter, datetime.now().strftime("%d/%m/%Y %H:%M:%S"), "Open", "N/A", "N/A", "N/A", st.session_state["email"]]
                 st.session_state["sheet2"].append_row([new_category])  # Add new product to the categories
                 st.session_state["existing_categories"].append(new_category)  # Update local cache
             else:  # User selects a product from dropdown
-                data_to_append = [customer, option, do_number, quantity, total_price, defect_type, description, action, submitter, datetime.now().strftime("%d/%m/%Y %H:%M:%S"), "Open", "No Comments", st.session_state["email"]]
+                data_to_append = [customer, option, do_number, quantity, total_price, defect_type, description, action, submitter, datetime.now().strftime("%d/%m/%Y %H:%M:%S"), "Open", "N/A", "N/A", "N/A", st.session_state["email"]]
 
             if is_duplicate_submission(data_to_append):  # If user submits the exact same submission on the same day
                 st.error("This submission already exists. Please do not submit a duplicate.")
